@@ -9,6 +9,9 @@ import {
   Platform,
   Share,
   Image,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -83,6 +86,9 @@ export default function ResultsScreen() {
   const { visitData } = useLocalSearchParams<{ visitData: string }>();
   const { dispatch } = useAssessment();
   const [isSaved, setIsSaved] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
 
   const visit: VisitRecord | null = visitData ? JSON.parse(visitData) : null;
 
@@ -546,11 +552,15 @@ export default function ResultsScreen() {
 
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: "#7C3AED" }]}
-            onPress={handleSendReport}
+            onPress={() => {
+              setReportText(generateReportText());
+              setIsCopied(false);
+              setShowReportModal(true);
+            }}
             activeOpacity={0.85}
           >
             <IconSymbol name="envelope.fill" size={20} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>إرسال التقرير</Text>
+            <Text style={styles.actionBtnText}>عرض وإرسال التقرير</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -574,6 +584,108 @@ export default function ResultsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal مربع نص الخطاب */}
+      <Modal
+        visible={showReportModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            {/* رأس المودال */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity
+                onPress={() => setShowReportModal(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Text style={{ fontSize: 22, color: colors.muted }}>✕</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                📝 نص الخطاب
+              </Text>
+              <View style={{ width: 36 }} />
+            </View>
+
+            {/* مربع النص القابل للتعديل */}
+            <ScrollView style={styles.modalScrollArea} keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={[styles.reportTextInput, {
+                  color: colors.foreground,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                }]}
+                multiline
+                value={reportText}
+                onChangeText={setReportText}
+                textAlign="right"
+                textAlignVertical="top"
+                scrollEnabled={false}
+                placeholder="نص الخطاب..."
+                placeholderTextColor={colors.muted}
+              />
+            </ScrollView>
+
+            {/* أزرار الإجراءات */}
+            <View style={[styles.modalActions, { borderTopColor: colors.border }]}>
+              {/* نسخ النص */}
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: isCopied ? "#16A34A" : colors.primary }]}
+                onPress={async () => {
+                  await Clipboard.setStringAsync(reportText);
+                  setIsCopied(true);
+                  if (Platform.OS !== "web") {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                  setTimeout(() => setIsCopied(false), 3000);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBtnText}>
+                  {isCopied ? "✓ تم النسخ" : "📋 نسخ النص"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* إرسال مع الصور */}
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: "#7C3AED" }]}
+                onPress={async () => {
+                  setShowReportModal(false);
+                  await handleSendReport();
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBtnText}>📤 إرسال مع الصور</Text>
+              </TouchableOpacity>
+
+              {/* مشاركة النص فقط */}
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: "#0891B2" }]}
+                onPress={async () => {
+                  setShowReportModal(false);
+                  try {
+                    await Share.share({
+                      message: reportText,
+                      title: `تقرير الزائر السري - ${visit.centerName}`,
+                    });
+                  } catch {
+                    await Clipboard.setStringAsync(reportText);
+                    Alert.alert("تم النسخ", "تم نسخ النص إلى الحافظة");
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBtnText}>💬 مشاركة النص فقط</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </ScreenContainer>
   );
 }
@@ -759,6 +871,73 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   actionBtnText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  // أنماط المودال
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  modalScrollArea: {
+    maxHeight: 380,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  reportTextInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 14,
+    lineHeight: 22,
+    minHeight: 280,
+    textAlign: "right",
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  modalActions: {
+    flexDirection: "column",
+    gap: 10,
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  modalBtn: {
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalBtnText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
