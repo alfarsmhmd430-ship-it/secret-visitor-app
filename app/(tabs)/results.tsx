@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -662,24 +663,32 @@ export default function ResultsScreen() {
                 <Text style={styles.modalBtnText}>📤 إرسال مع الصور</Text>
               </TouchableOpacity>
 
-              {/* مشاركة النص فقط */}
+              {/* إرسال عبر واتسآب بدون رابط */}
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: "#0891B2" }]}
+                style={[styles.modalBtn, { backgroundColor: "#25D366" }]}
                 onPress={async () => {
                   setShowReportModal(false);
                   try {
-                    await Share.share({
-                      message: reportText,
-                      title: `تقرير الزائر السري - ${visit.centerName}`,
-                    });
-                  } catch {
+                    // نسخ النص أولاً
                     await Clipboard.setStringAsync(reportText);
-                    Alert.alert("تم النسخ", "تم نسخ النص إلى الحافظة");
+                    // فتح واتسآب مباشرةً بالنص كمعاملة URL
+                    const encoded = encodeURIComponent(reportText);
+                    const whatsappUrl = `whatsapp://send?text=${encoded}`;
+                    const canOpen = await Linking.canOpenURL(whatsappUrl);
+                    if (canOpen) {
+                      await Linking.openURL(whatsappUrl);
+                    } else {
+                      // احتياطي: فتح واتسآب ويب
+                      const webUrl = `https://wa.me/?text=${encoded}`;
+                      await Linking.openURL(webUrl);
+                    }
+                  } catch {
+                    Alert.alert("تم النسخ", "تم نسخ النص إلى الحافظة، الصقه في واتسآب يدوياً");
                   }
                 }}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modalBtnText}>💬 مشاركة النص فقط</Text>
+                <Text style={styles.modalBtnText}>📱 إرسال عبر واتسآب</Text>
               </TouchableOpacity>
             </View>
           </View>
