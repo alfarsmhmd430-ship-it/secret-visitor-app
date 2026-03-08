@@ -13,6 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -91,6 +92,7 @@ export default function ResultsScreen() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportText, setReportText] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const visit: VisitRecord | null = visitData ? JSON.parse(visitData) : null;
 
@@ -338,11 +340,13 @@ export default function ResultsScreen() {
       Alert.alert("غير مدعوم", "تصدير PDF متاح على الجوال فقط");
       return;
     }
+    if (isGeneratingPDF) return; // منع الضغط المزدوج
     try {
+      setIsGeneratingPDF(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       // إنشاء HTML مع الصور مضمّنة Base64
       const html = await generateHtmlReport();
-      // تحويل HTML إلى PDF - الطريقة الصحيحة: shareAsync مباشرةً بدون moveAsync
+      // تحويل HTML إلى PDF
       const { uri } = await Print.printToFileAsync({
         html,
         margins: { left: 20, top: 30, right: 20, bottom: 30 },
@@ -356,6 +360,8 @@ export default function ResultsScreen() {
     } catch (err: any) {
       console.error("PDF Error:", err);
       Alert.alert("خطأ", `تعذّر إنشاء ملف PDF: ${err?.message ?? "خطأ غير معروف"}`);
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -606,6 +612,34 @@ export default function ResultsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* مؤشر تحميل PDF */}
+      {isGeneratingPDF && (
+        <View style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999,
+        }}>
+          <View style={{
+            backgroundColor: "#fff",
+            borderRadius: 16,
+            padding: 28,
+            alignItems: "center",
+            minWidth: 200,
+          }}>
+            <ActivityIndicator size="large" color="#DC2626" />
+            <Text style={{ marginTop: 14, fontSize: 15, fontWeight: "700", color: "#1A3A6B" }}>
+              جاري إنشاء التقرير...
+            </Text>
+            <Text style={{ marginTop: 6, fontSize: 12, color: "#64748B" }}>
+              يرجى الانتظار
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Modal مربع نص الخطاب */}
       <Modal
         visible={showReportModal}
@@ -674,9 +708,9 @@ export default function ResultsScreen() {
               {/* إرسال مع الصور */}
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: "#7C3AED" }]}
-                onPress={async () => {
+                onPress={() => {
                   setShowReportModal(false);
-                  await handleSendReport();
+                  setTimeout(() => { handleSendReport(); }, 300);
                 }}
                 activeOpacity={0.85}
               >
@@ -714,9 +748,11 @@ export default function ResultsScreen() {
               {/* تصدير PDF */}
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: "#DC2626" }]}
-                onPress={async () => {
+                onPress={() => {
+                  // إغلاق المودال وتشغيل الدالة بشكل مستقل بدون await لتجنّب تعارض إغلاق المودال
                   setShowReportModal(false);
-                  await handleExportPDF();
+                  // تأخير بسيط لإتاحة الوقت لإغلاق المودال قبل بدء العملية
+                  setTimeout(() => { handleExportPDF(); }, 300);
                 }}
                 activeOpacity={0.85}
               >
