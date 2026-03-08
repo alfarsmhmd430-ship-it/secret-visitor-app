@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useColors } from "@/hooks/use-colors";
 import * as Haptics from "expo-haptics";
 
 export default function LoginScreen() {
   const colors = useColors();
+  const router = useRouter();
   const { login } = useAuth();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +49,8 @@ export default function LoginScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+      // التوجيه للشاشة الرئيسية بعد نجاح تسجيل الدخول
+      router.replace("/(tabs)" as any);
     }
   };
 
