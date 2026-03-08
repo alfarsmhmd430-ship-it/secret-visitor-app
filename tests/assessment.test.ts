@@ -3,8 +3,8 @@ import { getComplianceLevel, ASSESSMENT_CATEGORIES, TOTAL_CRITERIA_COUNT } from 
 import { generateVisitId, formatDate } from "../lib/storage";
 
 describe("Assessment Criteria Data", () => {
-  it("should have 4 assessment categories", () => {
-    expect(ASSESSMENT_CATEGORIES).toHaveLength(4);
+  it("should have 7 assessment categories", () => {
+    expect(ASSESSMENT_CATEGORIES).toHaveLength(7);
   });
 
   it("should have correct category weights summing to 100", () => {
@@ -12,11 +12,15 @@ describe("Assessment Criteria Data", () => {
     expect(totalWeight).toBe(100);
   });
 
-  it("should have correct category weights: 40, 30, 20, 10", () => {
+  it("should have correct category weights: 40, 10, 20, 10, 5, 10, 5", () => {
+    // 7 محاور: تجربة المستفيد + سلامة + مكافحة عدوى + مرافق + موظفين + إمداد + ملاحظات
     expect(ASSESSMENT_CATEGORIES[0].weight).toBe(40); // تجربة المستفيد
-    expect(ASSESSMENT_CATEGORIES[1].weight).toBe(30); // السلامة ومكافحة العدوى
-    expect(ASSESSMENT_CATEGORIES[2].weight).toBe(20); // جودة المرافق والوصول
-    expect(ASSESSMENT_CATEGORIES[3].weight).toBe(10); // الجاهزية والكوادر
+    expect(ASSESSMENT_CATEGORIES[1].weight).toBe(10); // السلامة العامة
+    expect(ASSESSMENT_CATEGORIES[2].weight).toBe(20); // مكافحة العدوى
+    expect(ASSESSMENT_CATEGORIES[3].weight).toBe(10); // جودة المرافق والوصول
+    expect(ASSESSMENT_CATEGORIES[4].weight).toBe(5);  // تواجد الموظفين
+    expect(ASSESSMENT_CATEGORIES[5].weight).toBe(10); // الإمداد والتجهيزات
+    expect(ASSESSMENT_CATEGORIES[6].weight).toBe(5);  // الملاحظات العامة
   });
 
   it("should have criteria in each category", () => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   Image,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -20,7 +21,7 @@ import { useAssessment } from "@/lib/assessment-context";
 import { ASSESSMENT_CATEGORIES } from "@/constants/criteria-data";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
-// Date Picker Modal Component
+// ─── Date Picker Modal ───────────────────────────────────────────────────────
 function DatePickerModal({
   visible,
   currentDate,
@@ -52,7 +53,6 @@ function DatePickerModal({
 
   const getDaysInMonth = (year: number, month: number) =>
     new Date(year, month + 1, 0).getDate();
-
   const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
 
   const handleConfirm = () => {
@@ -150,7 +150,7 @@ function DatePickerModal({
   );
 }
 
-// Question Item Component
+// ─── Question Item ────────────────────────────────────────────────────────────
 function QuestionItem({
   questionId,
   question,
@@ -215,7 +215,10 @@ function QuestionItem({
   return (
     <View>
       {isFirstInSubcategory && subcategory && (
-        <Text style={[styles.subcategoryLabel, { color: colors.muted }]}>{subcategory}</Text>
+        <View style={styles.subcategoryRow}>
+          <View style={[styles.subcategoryDot, { backgroundColor: "#94A3B8" }]} />
+          <Text style={[styles.subcategoryLabel, { color: colors.muted }]}>{subcategory}</Text>
+        </View>
       )}
       <View
         style={[
@@ -284,7 +287,7 @@ function QuestionItem({
             <TextInput
               style={[
                 styles.reasonInput,
-                { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground },
+                { backgroundColor: colors.background, borderColor: "#FECACA", color: colors.foreground },
               ]}
               placeholder="اذكر سبب عدم الالتزام..."
               placeholderTextColor={colors.muted}
@@ -340,78 +343,160 @@ function QuestionItem({
   );
 }
 
-// Category Section Component
-function CategorySection({
+// ─── Category Tab Bar ─────────────────────────────────────────────────────────
+function CategoryTabBar({
+  categories,
+  activeIndex,
+  onSelect,
+  answers,
+}: {
+  categories: typeof ASSESSMENT_CATEGORIES;
+  activeIndex: number;
+  onSelect: (index: number) => void;
+  answers: Record<string, { answer: "yes" | "no" | null }>;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+
+  const getProgress = (cat: (typeof ASSESSMENT_CATEGORIES)[0]) => {
+    const answered = cat.criteria.filter(
+      (c) => answers[c.id]?.answer !== undefined && answers[c.id]?.answer !== null
+    ).length;
+    return Math.round((answered / cat.criteria.length) * 100);
+  };
+
+  return (
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabBar}
+      contentContainerStyle={styles.tabBarContent}
+    >
+      {categories.map((cat, idx) => {
+        const isActive = idx === activeIndex;
+        const progress = getProgress(cat);
+        return (
+          <TouchableOpacity
+            key={cat.id}
+            style={[
+              styles.tabItem,
+              {
+                backgroundColor: isActive ? cat.color : "transparent",
+                borderColor: isActive ? cat.color : "#E2E8F0",
+                borderWidth: 1.5,
+              },
+            ]}
+            onPress={() => onSelect(idx)}
+            activeOpacity={0.75}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: isActive ? "#FFFFFF" : "#64748B" },
+              ]}
+              numberOfLines={1}
+            >
+              {cat.name}
+            </Text>
+            {progress > 0 && (
+              <View
+                style={[
+                  styles.tabBadge,
+                  { backgroundColor: isActive ? "rgba(255,255,255,0.3)" : "#E2E8F0" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabBadgeText,
+                    { color: isActive ? "#FFFFFF" : "#64748B" },
+                  ]}
+                >
+                  {progress}%
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ─── Category Panel ───────────────────────────────────────────────────────────
+function CategoryPanel({
   category,
   colors,
 }: {
   category: (typeof ASSESSMENT_CATEGORIES)[0];
   colors: ReturnType<typeof useColors>;
 }) {
-  const [expanded, setExpanded] = useState(true);
   const { state } = useAssessment();
-
   const answeredInCat = category.criteria.filter(
     (c) => state.answers[c.id]?.answer !== undefined && state.answers[c.id]?.answer !== null
   ).length;
   const yesInCat = category.criteria.filter((c) => state.answers[c.id]?.answer === "yes").length;
   const noInCat = category.criteria.filter((c) => state.answers[c.id]?.answer === "no").length;
 
-  // Track subcategories
   const subcategoryTracker: Record<string, boolean> = {};
 
   return (
-    <View style={[styles.categorySection, { borderColor: colors.border }]}>
-      <TouchableOpacity
-        style={[styles.categoryHeader, { backgroundColor: category.color }]}
-        onPress={() => setExpanded((e) => !e)}
-        activeOpacity={0.85}
-      >
-        <View style={styles.categoryHeaderLeft}>
-          <IconSymbol
-            name={expanded ? "chevron.up" : "chevron.down"}
-            size={18}
-            color="#FFFFFF"
-          />
-          <Text style={styles.categoryWeight}>{category.weight}%</Text>
-        </View>
-        <View style={styles.categoryHeaderRight}>
-          <Text style={styles.categoryName}>{category.name}</Text>
-          <Text style={styles.categoryProgress}>
-            {answeredInCat}/{category.criteria.length} | ✓{yesInCat} ✗{noInCat}
+    <View>
+      {/* Category Header */}
+      <View style={[styles.catPanelHeader, { backgroundColor: category.color }]}>
+        <View style={styles.catPanelHeaderRight}>
+          <Text style={styles.catPanelName}>{category.name}</Text>
+          <Text style={styles.catPanelStats}>
+            {answeredInCat}/{category.criteria.length} سؤال | ✓{yesInCat} ✗{noInCat}
           </Text>
         </View>
-      </TouchableOpacity>
-
-      {expanded && (
-        <View style={styles.criteriaList}>
-          {category.criteria.map((criterion, idx) => {
-            const isFirst = !subcategoryTracker[criterion.subcategory ?? ""];
-            if (criterion.subcategory) subcategoryTracker[criterion.subcategory] = true;
-            return (
-              <QuestionItem
-                key={criterion.id}
-                questionId={criterion.id}
-                question={criterion.question}
-                subcategory={criterion.subcategory}
-                isFirstInSubcategory={isFirst}
-                colors={colors}
-              />
-            );
-          })}
+        <View style={[styles.catWeightBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+          <Text style={styles.catWeightText}>{category.weight}%</Text>
         </View>
-      )}
+      </View>
+
+      {/* Progress bar */}
+      <View style={[styles.catProgressBar, { backgroundColor: "#E5E7EB" }]}>
+        <View
+          style={[
+            styles.catProgressFill,
+            {
+              width: `${category.criteria.length > 0 ? Math.round((answeredInCat / category.criteria.length) * 100) : 0}%`,
+              backgroundColor: category.color,
+            },
+          ]}
+        />
+      </View>
+
+      {/* Questions */}
+      <View style={styles.criteriaList}>
+        {category.criteria.map((criterion) => {
+          const isFirst = !subcategoryTracker[criterion.subcategory ?? ""];
+          if (criterion.subcategory) subcategoryTracker[criterion.subcategory] = true;
+          return (
+            <QuestionItem
+              key={criterion.id}
+              questionId={criterion.id}
+              question={criterion.question}
+              subcategory={criterion.subcategory}
+              isFirstInSubcategory={isFirst}
+              colors={colors}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
 
-// Main Assessment Screen
+// ─── Main Assessment Screen ───────────────────────────────────────────────────
 export default function AssessmentScreen() {
   const colors = useColors();
   const router = useRouter();
   const { state, dispatch, buildVisitRecord, getAnsweredCount, getTotalCount, getProgressPercentage } =
     useAssessment();
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [activeCatIndex, setActiveCatIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
 
   const progress = getProgressPercentage();
   const answered = getAnsweredCount();
@@ -425,6 +510,11 @@ export default function AssessmentScreen() {
       "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
     ];
     return `${parseInt(day)} ${months[parseInt(month)]} ${year}`;
+  };
+
+  const handleCatSelect = (index: number) => {
+    setActiveCatIndex(index);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   const handleFinish = useCallback(() => {
@@ -446,78 +536,132 @@ export default function AssessmentScreen() {
   const progressColor =
     progress >= 80 ? "#16A34A" : progress >= 40 ? "#D97706" : colors.primary;
 
+  const activeCategory = ASSESSMENT_CATEGORIES[activeCatIndex];
+
   return (
     <ScreenContainer containerClassName="bg-background">
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={[styles.assessmentHeader, { backgroundColor: colors.primary }]}>
-          <Text style={styles.assessmentTitle}>نموذج التقييم</Text>
-          <Text style={styles.assessmentSubtitle}>الزائر السري - مراكز الرعاية الأولية</Text>
-        </View>
+      {/* Fixed Header */}
+      <View style={[styles.assessmentHeader, { backgroundColor: colors.primary }]}>
+        <Text style={styles.assessmentTitle}>نموذج التقييم</Text>
+        <Text style={styles.assessmentSubtitle}>الزائر السري - مراكز الرعاية الأولية</Text>
+      </View>
 
-        {/* Progress Bar */}
-        <View style={[styles.progressContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.progressInfo}>
-            <Text style={[styles.progressLabel, { color: colors.muted }]}>
-              {answered} من {total} سؤال
-            </Text>
-            <Text style={[styles.progressPercent, { color: progressColor }]}>{progress}%</Text>
-          </View>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View
-              style={[styles.progressFill, { width: `${progress}%`, backgroundColor: progressColor }]}
-            />
-          </View>
-        </View>
-
-        {/* Center Name & Date */}
-        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.infoLabel, { color: colors.foreground }]}>اسم المركز الصحي *</Text>
-          <TextInput
-            style={[
-              styles.centerInput,
-              { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground },
-            ]}
-            placeholder="أدخل اسم المركز الصحي..."
-            placeholderTextColor={colors.muted}
-            value={state.centerName}
-            onChangeText={(text) => dispatch({ type: "SET_CENTER_NAME", payload: text })}
-            textAlign="right"
-            returnKeyType="done"
-          />
-
-          <Text style={[styles.infoLabel, { color: colors.foreground, marginTop: 16 }]}>
-            تاريخ الزيارة *
+      {/* Overall Progress */}
+      <View style={[styles.progressContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.progressInfo}>
+          <Text style={[styles.progressLabel, { color: colors.muted }]}>
+            {answered} من {total} سؤال
           </Text>
-          <TouchableOpacity
-            style={[
-              styles.dateButton,
-              { backgroundColor: colors.background, borderColor: colors.border },
-            ]}
-            onPress={() => setShowDatePicker(true)}
-            activeOpacity={0.7}
-          >
-            <IconSymbol name="clock.fill" size={18} color={colors.primary} />
-            <Text style={[styles.dateButtonText, { color: state.visitDate ? colors.foreground : colors.muted }]}>
+          <Text style={[styles.progressPercent, { color: progressColor }]}>{progress}%</Text>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View
+            style={[styles.progressFill, { width: `${progress}%`, backgroundColor: progressColor }]}
+          />
+        </View>
+      </View>
+
+      {/* Category Tab Bar */}
+      <CategoryTabBar
+        categories={ASSESSMENT_CATEGORIES}
+        activeIndex={activeCatIndex}
+        onSelect={handleCatSelect}
+        answers={state.answers as any}
+      />
+
+      {/* Scrollable Content */}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Center Name & Date (only visible on first category or always) */}
+        {activeCatIndex === 0 && (
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.infoLabel, { color: colors.foreground }]}>اسم المركز الصحي *</Text>
+            <TextInput
+              style={[
+                styles.centerInput,
+                { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground },
+              ]}
+              placeholder="أدخل اسم المركز الصحي..."
+              placeholderTextColor={colors.muted}
+              value={state.centerName}
+              onChangeText={(text) => dispatch({ type: "SET_CENTER_NAME", payload: text })}
+              textAlign="right"
+              returnKeyType="done"
+            />
+
+            <Text style={[styles.infoLabel, { color: colors.foreground, marginTop: 16 }]}>
+              تاريخ الزيارة *
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.dateButton,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.7}
+            >
+              <IconSymbol name="clock.fill" size={18} color={colors.primary} />
+              <Text style={[styles.dateButtonText, { color: state.visitDate ? colors.foreground : colors.muted }]}>
+                {formatDisplayDate(state.visitDate)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Active Category Panel */}
+        <CategoryPanel category={activeCategory} colors={colors} />
+
+        {/* Navigation Buttons */}
+        <View style={styles.navButtons}>
+          {activeCatIndex > 0 && (
+            <TouchableOpacity
+              style={[styles.navBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => handleCatSelect(activeCatIndex - 1)}
+              activeOpacity={0.8}
+            >
+              <IconSymbol name="chevron.right" size={18} color={colors.primary} />
+              <Text style={[styles.navBtnText, { color: colors.primary }]}>
+                {ASSESSMENT_CATEGORIES[activeCatIndex - 1].name}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {activeCatIndex < ASSESSMENT_CATEGORIES.length - 1 ? (
+            <TouchableOpacity
+              style={[styles.navBtn, styles.navBtnNext, { backgroundColor: activeCategory.color }]}
+              onPress={() => handleCatSelect(activeCatIndex + 1)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.navBtnNextText}>
+                {ASSESSMENT_CATEGORIES[activeCatIndex + 1].name}
+              </Text>
+              <IconSymbol name="chevron.left" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.finishBtn, { backgroundColor: colors.primary }]}
+              onPress={handleFinish}
+              activeOpacity={0.85}
+            >
+              <IconSymbol name="checkmark.circle.fill" size={22} color="#FFFFFF" />
+              <Text style={styles.finishBtnText}>إنهاء التقييم وعرض النتائج</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Center info reminder if not first tab */}
+        {activeCatIndex > 0 && (
+          <View style={[styles.centerReminder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.centerReminderText, { color: colors.muted }]}>
+              {state.centerName ? `المركز: ${state.centerName}` : "لم يُدخل اسم المركز"}
+              {" · "}
               {formatDisplayDate(state.visitDate)}
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Categories */}
-        {ASSESSMENT_CATEGORIES.map((category) => (
-          <CategorySection key={category.id} category={category} colors={colors} />
-        ))}
-
-        {/* Finish Button */}
-        <TouchableOpacity
-          style={[styles.finishBtn, { backgroundColor: colors.primary }]}
-          onPress={handleFinish}
-          activeOpacity={0.85}
-        >
-          <IconSymbol name="checkmark.circle.fill" size={22} color="#FFFFFF" />
-          <Text style={styles.finishBtnText}>إنهاء التقييم وعرض النتائج</Text>
-        </TouchableOpacity>
+          </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -534,62 +678,97 @@ export default function AssessmentScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    paddingBottom: 20,
-  },
   assessmentHeader: {
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
     paddingHorizontal: 20,
   },
   assessmentTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "800",
     color: "#FFFFFF",
     textAlign: "right",
   },
   assessmentSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255,255,255,0.8)",
-    marginTop: 4,
+    marginTop: 2,
     textAlign: "right",
   },
   progressContainer: {
-    margin: 16,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
   },
   progressInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
   },
   progressPercent: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
   },
   progressTrack: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 4,
+    borderRadius: 3,
+  },
+  // Tab bar
+  tabBar: {
+    maxHeight: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  tabBarContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tabItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: "600",
+    maxWidth: 90,
+  },
+  tabBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  // Scroll content
+  scrollContent: {
+    paddingBottom: 20,
   },
   infoCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
+    margin: 16,
+    marginBottom: 8,
     padding: 16,
     borderRadius: 14,
     borderWidth: 1,
   },
   infoLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     textAlign: "right",
     marginBottom: 8,
@@ -616,61 +795,78 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-  categorySection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-  },
-  categoryHeader: {
+  // Category panel
+  catPanelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
   },
-  categoryHeaderRight: {
+  catPanelHeaderRight: {
+    flex: 1,
     alignItems: "flex-end",
   },
-  categoryHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  categoryName: {
+  catPanelName: {
     fontSize: 16,
     fontWeight: "700",
     color: "#FFFFFF",
     textAlign: "right",
   },
-  categoryProgress: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
+  catPanelStats: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.85)",
     marginTop: 2,
     textAlign: "right",
   },
-  categoryWeight: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.9)",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+  catWeightBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+  catWeightText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  catProgressBar: {
+    height: 3,
+    marginHorizontal: 16,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  catProgressFill: {
+    height: "100%",
+    borderRadius: 2,
   },
   criteriaList: {
-    padding: 12,
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 6,
+  },
+  subcategoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 10,
+    paddingBottom: 4,
+    paddingHorizontal: 4,
+  },
+  subcategoryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   subcategoryLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "right",
-    paddingHorizontal: 4,
-    paddingTop: 8,
-    paddingBottom: 4,
+    fontSize: 11,
+    fontWeight: "700",
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   questionCard: {
     borderRadius: 10,
@@ -759,15 +955,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  finishBtn: {
+  // Navigation
+  navButtons: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 10,
+  },
+  navBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
-    gap: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  navBtnNext: {
+    borderWidth: 0,
+  },
+  navBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  navBtnNextText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  finishBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
     shadowColor: "#1B4F8A",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -776,8 +1000,20 @@ const styles = StyleSheet.create({
   },
   finishBtnText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
+  },
+  centerReminder: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  centerReminderText: {
+    fontSize: 12,
+    textAlign: "center",
   },
   // Date Picker Modal
   modalOverlay: {
