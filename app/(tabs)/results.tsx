@@ -162,21 +162,214 @@ export default function ResultsScreen() {
     return report;
   };
 
-  const handleSendReport = async () => {
-    const reportText = generateReportText();
+  // جمع جميع الصور التوثيقية من إجابات "لا"
+  const getAllPhotos = () => {
+    const photos: { questionId: string; uri: string }[] = [];
+    visit.answers.forEach((a) => {
+      if (a.answer === "no" && a.photoUris && a.photoUris.length > 0) {
+        a.photoUris.forEach((uri) => photos.push({ questionId: a.questionId, uri }));
+      }
+    });
+    return photos;
+  };
 
+  const generateHtmlReport = async () => {
+    const noAnswers = visit.answers.filter((a) => a.answer === "no");
+    const noWithReasons = noAnswers.filter((a) => a.reason?.trim() || (a.photoUris && a.photoUris.length > 0));
+    const allPhotos = getAllPhotos();
+
+    // تحويل الصور إلى Base64 لتضمينها في HTML
+    const photoBase64Map: Record<string, string> = {};
+    if (Platform.OS !== "web") {
+      for (const photo of allPhotos) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(photo.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          photoBase64Map[photo.uri] = `data:image/jpeg;base64,${base64}`;
+        } catch {
+          // تجاهل الصور التي لا يمكن قراءتها
+        }
+      }
+    }
+
+    // بناء محتوى الملاحظات بالصور
+    let observationsHtml = "";
+    ASSESSMENT_CATEGORIES.forEach((category) => {
+      const catObs = noWithReasons.filter((a) =>
+        category.criteria.some((c) => c.id === a.questionId)
+      );
+      if (catObs.length === 0) return;
+      observationsHtml += `<div class="category-section">`;
+      observationsHtml += `<h3 style="color:${category.color};border-right:4px solid ${category.color};padding-right:10px;">${category.name}</h3>`;
+      catObs.forEach((obs) => {
+        const criterion = category.criteria.find((c) => c.id === obs.questionId);
+        if (!criterion) return;
+        observationsHtml += `<div class="obs-item">`;
+        observationsHtml += `<p class="obs-question">❌ ${criterion.question}</p>`;
+        if (obs.reason) observationsHtml += `<p class="obs-reason"><strong>السبب:</strong> ${obs.reason}</p>`;
+        if (obs.photoUris && obs.photoUris.length > 0) {
+          observationsHtml += `<div class="photos-row">`;
+          obs.photoUris.forEach((uri) => {
+            const src = photoBase64Map[uri] || uri;
+            observationsHtml += `<img src="${src}" class="obs-photo" alt="صورة توثيقية" />`;
+          });
+          observationsHtml += `</div>`;
+        }
+        observationsHtml += `</div>`;
+      });
+      observationsHtml += `</div>`;
+    });
+
+    // نتائج المحاور
+    let categoriesHtml = "";
+    visit.categoryResults.forEach((cat) => {
+      const catLevel = getComplianceLevel(cat.percentage);
+      categoriesHtml += `
+        <tr>
+          <td style="text-align:right;padding:8px 12px;">${cat.categoryName}</td>
+          <td style="text-align:center;padding:8px 12px;">${cat.weight}%</td>
+          <td style="text-align:center;padding:8px 12px;color:${catLevel.color};font-weight:bold;">${cat.percentage}%</td>
+          <td style="text-align:center;padding:8px 12px;color:#16A34A;">${cat.yesCount} ✓</td>
+          <td style="text-align:center;padding:8px 12px;color:#DC2626;">${cat.noCount} ✗</td>
+        </tr>`;
+    });
+
+    const levelInfo = getComplianceLevel(visit.overallPercentage);
+    const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير الزائر السري - ${visit.centerName}</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+  .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+  .header { background: linear-gradient(135deg, #1A3A6B, #2563EB); color: white; padding: 30px; text-align: center; }
+  .header h1 { margin: 0 0 8px; font-size: 26px; }
+  .header p { margin: 4px 0; opacity: 0.9; font-size: 15px; }
+  .body { padding: 30px; }
+  .greeting { font-size: 16px; line-height: 1.8; margin-bottom: 24px; }
+  .stats-box { background: #f1f5f9; border-radius: 10px; padding: 20px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; }
+  .stat-item { }
+  .stat-num { font-size: 32px; font-weight: 800; color: ${levelInfo.color}; }
+  .stat-lbl { font-size: 13px; color: #64748b; margin-top: 4px; }
+  .section-title { font-size: 18px; font-weight: 700; color: #1A3A6B; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin: 24px 0 16px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #1A3A6B; color: white; padding: 10px 12px; text-align: center; font-size: 14px; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .category-section { margin-bottom: 20px; }
+  .obs-item { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .obs-question { font-weight: 600; color: #1e293b; margin: 0 0 6px; font-size: 14px; line-height: 1.6; }
+  .obs-reason { color: #dc2626; margin: 0 0 10px; font-size: 13px; }
+  .photos-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .obs-photo { width: 160px; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid #fca5a5; }
+  .footer-letter { background: #f8fafc; border-right: 4px solid #1A3A6B; padding: 20px; border-radius: 8px; margin-top: 24px; font-size: 14px; line-height: 2; }
+  .signature { margin-top: 20px; font-weight: 700; color: #1A3A6B; }
+  .print-footer { text-align: center; margin-top: 30px; color: #94a3b8; font-size: 12px; }
+  @media print { body { background: white; } .container { box-shadow: none; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🏥 تقرير الزائر السري</h1>
+    <p>مركز: <strong>${visit.centerName}</strong></p>
+    <p>تاريخ الزيارة: ${formatDate(visit.visitDate)}</p>
+  </div>
+  <div class="body">
+    <p class="greeting">بسم الله الرحمن الرحيم<br>المكرم مدير ${visit.centerName}،<br>السلام عليكم ورحمة الله وبركاته،</p>
+
+    <div class="stats-box">
+      <div class="stat-item">
+        <div class="stat-num" style="color:${levelInfo.color}">${visit.overallPercentage}%</div>
+        <div class="stat-lbl">نسبة الالتزام الإجمالية</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" style="color:#16A34A">${visit.totalYes}</div>
+        <div class="stat-lbl">إجابات نعم ✓</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" style="color:#DC2626">${visit.totalNo}</div>
+        <div class="stat-lbl">إجابات لا ✗</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" style="color:#1A3A6B">${visit.totalYes + visit.totalNo}</div>
+        <div class="stat-lbl">إجمالي المُجاب</div>
+      </div>
+    </div>
+
+    <div class="section-title">📊 نتائج المحاور</div>
+    <table>
+      <thead><tr><th>المحور</th><th>الوزن</th><th>نسبة الالتزام</th><th>نعم</th><th>لا</th></tr></thead>
+      <tbody>${categoriesHtml}</tbody>
+    </table>
+
+    ${observationsHtml.length > 0 ? `<div class="section-title">📋 الملاحظات التفصيلية مع الصور التوثيقية</div>${observationsHtml}` : ""}
+
+    <div class="footer-letter">
+      يرجى اتخاذ الإجراءات لتحليل الأسباب واتخاذ الإجراءات المناسبة لتحسينها في مدة <strong>أسبوعين من تاريخه</strong>، وإرسال ما تم من تحسينات بالصور، أو بأخذ إقرار إذا كانت الملاحظة تخص تواجد الموظفين أو عدم الالتزام بالإجراءات.
+      <div class="signature">
+        مع أطيب تحياتنا،<br>
+        فريق الزائر السري<br>
+        مدير إدارة الزائر السري بتجمع الجوف الصحي<br>
+        إلهام مبارك البحيران
+      </div>
+    </div>
+
+    <div class="print-footer">تم إنشاء هذا التقرير بواسطة تطبيق الزائر السري · تجمع الجوف الصحي</div>
+  </div>
+</div>
+</body>
+</html>`;
+    return html;
+  };
+
+  const handleSendReport = async () => {
     if (Platform.OS === "web") {
+      const reportText = generateReportText();
       await Clipboard.setStringAsync(reportText);
       Alert.alert("تم النسخ", "تم نسخ التقرير إلى الحافظة. يمكنك لصقه في البريد الإلكتروني.");
       return;
     }
 
     try {
-      await Share.share({
-        message: reportText,
-        title: `تقرير الزائر السري - ${visit.centerName}`,
-      });
-    } catch {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const allPhotos = getAllPhotos();
+      const hasPhotos = allPhotos.length > 0;
+
+      if (hasPhotos) {
+        // إنشاء تقرير HTML مع الصور مضمّنة
+        const html = await generateHtmlReport();
+        const fileName = `تقرير_${visit.centerName}_${visit.visitDate}.html`;
+        const fileUri = FileSystem.documentDirectory + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, html, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: "text/html",
+            dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
+            UTI: "public.html",
+          });
+        } else {
+          // احتياطي: مشاركة النص فقط
+          await Share.share({
+            message: generateReportText(),
+            title: `تقرير الزائر السري - ${visit.centerName}`,
+          });
+        }
+      } else {
+        // لا توجد صور - مشاركة النص مباشرة
+        await Share.share({
+          message: generateReportText(),
+          title: `تقرير الزائر السري - ${visit.centerName}`,
+        });
+      }
+    } catch (err) {
+      const reportText = generateReportText();
       await Clipboard.setStringAsync(reportText);
       Alert.alert("تم النسخ", "تم نسخ التقرير إلى الحافظة");
     }

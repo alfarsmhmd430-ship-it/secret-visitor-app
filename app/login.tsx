@@ -145,7 +145,7 @@ export default function LoginScreen() {
 
               {/* تلميح كلمة المرور الافتراضية */}
               <Text style={[styles.hint, { color: colors.muted }]}>
-                كلمة المرور الافتراضية: 1234
+                
               </Text>
             </View>
 

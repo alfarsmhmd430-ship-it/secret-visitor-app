@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const AUTH_KEY = "secret_visitor_auth";
 const SESSION_KEY = "secret_visitor_session";
 // كلمة المرور الافتراضية
-const DEFAULT_PASSWORD = "1234";
+const DEFAULT_PASSWORD = "mans4523";
 
 interface AuthContextType {
   isAuthenticated: boolean;
