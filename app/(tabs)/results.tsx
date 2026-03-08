@@ -19,6 +19,7 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import * as Print from "expo-print";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useAssessment } from "@/lib/assessment-context";
@@ -330,6 +331,39 @@ export default function ResultsScreen() {
 </body>
 </html>`;
     return html;
+  };
+
+  const handleExportPDF = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("غير مدعوم", "تصدير PDF متاح على الجوال فقط");
+      return;
+    }
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // إنشاء HTML مع الصور مضمّنة Base64
+      const html = await generateHtmlReport();
+      // تحويل HTML إلى PDF
+      const { uri } = await Print.printToFileAsync({
+        html,
+        margins: { left: 20, top: 30, right: 20, bottom: 30 },
+      });
+      // نقل الملف إلى مسار دائم
+      const fileName = `تقرير_الزائر_السري_${visit.centerName}_${visit.visitDate}.pdf`;
+      const destUri = FileSystem.documentDirectory + fileName;
+      await FileSystem.moveAsync({ from: uri, to: destUri });
+      // مشاركة الملف
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(destUri, {
+          mimeType: "application/pdf",
+          dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("تم إنشاء الملف", `تم حفظ التقرير في: ${destUri}`);
+      }
+    } catch (err) {
+      Alert.alert("خطأ", "تعذّر إنشاء ملف PDF، يرجى المحاولة مرة أخرى");
+    }
   };
 
   const handleSendReport = async () => {
@@ -689,6 +723,18 @@ export default function ResultsScreen() {
                 activeOpacity={0.85}
               >
                 <Text style={styles.modalBtnText}>📱 إرسال عبر واتسآب</Text>
+              </TouchableOpacity>
+
+              {/* تصدير PDF */}
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: "#DC2626" }]}
+                onPress={async () => {
+                  setShowReportModal(false);
+                  await handleExportPDF();
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBtnText}>📄 تصدير PDF مع الصور</Text>
               </TouchableOpacity>
             </View>
           </View>
