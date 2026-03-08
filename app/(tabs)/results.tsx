@@ -342,27 +342,20 @@ export default function ResultsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       // إنشاء HTML مع الصور مضمّنة Base64
       const html = await generateHtmlReport();
-      // تحويل HTML إلى PDF
+      // تحويل HTML إلى PDF - الطريقة الصحيحة: shareAsync مباشرةً بدون moveAsync
       const { uri } = await Print.printToFileAsync({
         html,
         margins: { left: 20, top: 30, right: 20, bottom: 30 },
       });
-      // نقل الملف إلى مسار دائم
-      const fileName = `تقرير_الزائر_السري_${visit.centerName}_${visit.visitDate}.pdf`;
-      const destUri = FileSystem.documentDirectory + fileName;
-      await FileSystem.moveAsync({ from: uri, to: destUri });
-      // مشاركة الملف
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(destUri, {
-          mimeType: "application/pdf",
-          dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
-          UTI: "com.adobe.pdf",
-        });
-      } else {
-        Alert.alert("تم إنشاء الملف", `تم حفظ التقرير في: ${destUri}`);
-      }
-    } catch (err) {
-      Alert.alert("خطأ", "تعذّر إنشاء ملف PDF، يرجى المحاولة مرة أخرى");
+      // مشاركة الملف مباشرةً من المسار المؤقت
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
+        UTI: "com.adobe.pdf",
+      });
+    } catch (err: any) {
+      console.error("PDF Error:", err);
+      Alert.alert("خطأ", `تعذّر إنشاء ملف PDF: ${err?.message ?? "خطأ غير معروف"}`);
     }
   };
 
@@ -381,27 +374,18 @@ export default function ResultsScreen() {
       const hasPhotos = allPhotos.length > 0;
 
       if (hasPhotos) {
-        // إنشاء تقرير HTML مع الصور مضمّنة
+        // إنشاء تقرير HTML مع الصور مضمّنة Base64 ثم تحويله إلى PDF
         const html = await generateHtmlReport();
-        const fileName = `تقرير_${visit.centerName}_${visit.visitDate}.html`;
-        const fileUri = FileSystem.documentDirectory + fileName;
-        await FileSystem.writeAsStringAsync(fileUri, html, {
-          encoding: FileSystem.EncodingType.UTF8,
+        // استخدام PDF بدلاً من HTML لضمان عرض الصور بشكل صحيح
+        const { uri } = await Print.printToFileAsync({
+          html,
+          margins: { left: 20, top: 30, right: 20, bottom: 30 },
         });
-
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: "text/html",
-            dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
-            UTI: "public.html",
-          });
-        } else {
-          // احتياطي: مشاركة النص فقط
-          await Share.share({
-            message: generateReportText(),
-            title: `تقرير الزائر السري - ${visit.centerName}`,
-          });
-        }
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `تقرير الزائر السري - ${visit.centerName}`,
+          UTI: "com.adobe.pdf",
+        });
       } else {
         // لا توجد صور - مشاركة النص مباشرة
         await Share.share({
@@ -409,10 +393,12 @@ export default function ResultsScreen() {
           title: `تقرير الزائر السري - ${visit.centerName}`,
         });
       }
-    } catch (err) {
-      const reportText = generateReportText();
-      await Clipboard.setStringAsync(reportText);
-      Alert.alert("تم النسخ", "تم نسخ التقرير إلى الحافظة");
+    } catch (err: any) {
+      console.error("Send Report Error:", err);
+      // احتياطي: نسخ النص للحافظة
+      const text = generateReportText();
+      await Clipboard.setStringAsync(text);
+      Alert.alert("تم النسخ", "تم نسخ التقرير إلى الحافظة، الصقه في أي تطبيق");
     }
   };
 
