@@ -153,6 +153,9 @@ export default function LoginScreen() {
             <Text style={styles.footer}>
               إدارة الزائر السري · تجمع الجوف الصحي
             </Text>
+            <Text style={styles.copyright}>
+              © فريق الزائر السري · M.lafiAlshrari
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -297,5 +300,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.5)",
     textAlign: "center",
+  },
+  copyright: {
+    marginTop: 4,
+    fontSize: 8,
+    color: "rgba(255,255,255,0.3)",
+    textAlign: "center",
+    letterSpacing: 0.5,
   },
 });

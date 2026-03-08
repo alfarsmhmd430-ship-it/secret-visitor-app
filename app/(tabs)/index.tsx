@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
+import { AppFooter } from "@/components/app-footer";
 import { useColors } from "@/hooks/use-colors";
 import { getAllVisits, VisitRecord, formatDate } from "@/lib/storage";
 import { getComplianceLevel } from "@/constants/criteria-data";
@@ -206,6 +207,7 @@ export default function HomeScreen() {
           </View>
         }
       />
+      <AppFooter />
     </ScreenContainer>
   );
 }

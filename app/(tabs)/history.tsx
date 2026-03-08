@@ -15,6 +15,7 @@ import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
+import { AppFooter } from "@/components/app-footer";
 import { useColors } from "@/hooks/use-colors";
 import { getAllVisits, deleteVisit, VisitRecord, formatDate } from "@/lib/storage";
 import { getComplianceLevel, ASSESSMENT_CATEGORIES } from "@/constants/criteria-data";
@@ -203,6 +204,7 @@ export default function HistoryScreen() {
           </View>
         }
       />
+      <AppFooter />
     </ScreenContainer>
   );
 }
