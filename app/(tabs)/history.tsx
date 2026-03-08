@@ -167,8 +167,17 @@ export default function HistoryScreen() {
         ListHeaderComponent={
           <View>
             <View style={[styles.header, { backgroundColor: colors.primary }]}>
-              <Text style={styles.headerTitle}>سجل الزيارات</Text>
-              <Text style={styles.headerSubtitle}>{visits.length} زيارة مسجلة</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle}>سجل الزيارات</Text>
+                <Text style={styles.headerSubtitle}>{visits.length} زيارة مسجلة</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.settingsBtn}
+                onPress={() => router.push("/change-password" as any)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={{ fontSize: 20 }}>⚙️</Text>
+              </TouchableOpacity>
             </View>
             {visits.length > 0 && (
               <TouchableOpacity
@@ -206,6 +215,18 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
   },
   headerTitle: {
     fontSize: 24,

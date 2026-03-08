@@ -14,6 +14,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AssessmentProvider } from "@/lib/assessment-context";
+import { AuthProvider } from "@/lib/auth-context";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -93,7 +94,9 @@ export default function RootLayout() {
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
             <Stack.Screen name="visit-detail" options={{ presentation: "card" }} />
+            <Stack.Screen name="change-password" options={{ presentation: "card" }} />
             <Stack.Screen name="oauth/callback" />
           </Stack>
           <StatusBar style="auto" />
@@ -107,24 +110,28 @@ export default function RootLayout() {
   if (shouldOverrideSafeArea) {
     return (
       <ThemeProvider>
-        <AssessmentProvider>
-          <SafeAreaProvider initialMetrics={providerInitialMetrics}>
-            <SafeAreaFrameContext.Provider value={frame}>
-              <SafeAreaInsetsContext.Provider value={insets}>
-                {content}
-              </SafeAreaInsetsContext.Provider>
-            </SafeAreaFrameContext.Provider>
-          </SafeAreaProvider>
-        </AssessmentProvider>
+        <AuthProvider>
+          <AssessmentProvider>
+            <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+              <SafeAreaFrameContext.Provider value={frame}>
+                <SafeAreaInsetsContext.Provider value={insets}>
+                  {content}
+                </SafeAreaInsetsContext.Provider>
+              </SafeAreaFrameContext.Provider>
+            </SafeAreaProvider>
+          </AssessmentProvider>
+        </AuthProvider>
       </ThemeProvider>
     );
   }
 
   return (
     <ThemeProvider>
-      <AssessmentProvider>
-        <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
-      </AssessmentProvider>
+      <AuthProvider>
+        <AssessmentProvider>
+          <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+        </AssessmentProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  Image,
+  Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -14,12 +14,39 @@ import { useColors } from "@/hooks/use-colors";
 import { getAllVisits, VisitRecord, formatDate } from "@/lib/storage";
 import { getComplianceLevel } from "@/constants/criteria-data";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/lib/auth-context";
 
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // توجيه لشاشة تسجيل الدخول إذا لم يكن المستخدم مصادقاً
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login" as any);
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      "تسجيل الخروج",
+      "هل تريد تسجيل الخروج من التطبيق؟",
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "تسجيل الخروج",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/login" as any);
+          },
+        },
+      ]
+    );
+  }, [logout, router]);
 
   const loadVisits = useCallback(async () => {
     const data = await getAllVisits();
@@ -45,6 +72,9 @@ export default function HomeScreen() {
       : 0;
 
   const complianceLevel = getComplianceLevel(avgCompliance);
+
+  // لا تعرض شيئاً أثناء التحقق من المصادقة
+  if (isLoading || !isAuthenticated) return null;
 
   const renderVisitItem = ({ item }: { item: VisitRecord }) => {
     const level = getComplianceLevel(item.overallPercentage);
@@ -74,7 +104,7 @@ export default function HomeScreen() {
             <View
               style={[
                 styles.progressFill,
-                { width: `${item.overallPercentage}%`, backgroundColor: level.color },
+                { width: `${item.overallPercentage}%` as any, backgroundColor: level.color },
               ]}
             />
           </View>
@@ -110,14 +140,20 @@ export default function HomeScreen() {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.primary }]}>
               <View style={styles.headerContent}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.headerTitle}>الزائر السري</Text>
                   <Text style={styles.headerSubtitle}>تقييم مراكز الرعاية الصحية الأولية</Text>
                   <Text style={styles.headerOrg}>تجمع الجوف الصحي</Text>
                 </View>
-                <View style={styles.headerIcon}>
-                  <Text style={styles.headerEmoji}>🏥</Text>
-                </View>
+                {/* زر تسجيل الخروج */}
+                <TouchableOpacity
+                  style={styles.logoutBtn}
+                  onPress={handleLogout}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.logoutIcon}>🚪</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -206,16 +242,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: "right",
   },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  logoutBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: 12,
   },
-  headerEmoji: {
-    fontSize: 28,
+  logoutIcon: {
+    fontSize: 20,
   },
   statsRow: {
     flexDirection: "row",
