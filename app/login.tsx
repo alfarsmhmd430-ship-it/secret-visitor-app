@@ -70,7 +70,7 @@ export default function LoginScreen() {
             <View style={styles.headerSection}>
               <View style={styles.logoContainer}>
                 <Image
-                  source={require("@/assets/images/icon.png")}
+                  source={require("@/assets/images/jouf-logo.jpg")}
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -78,6 +78,7 @@ export default function LoginScreen() {
               <Text style={styles.appTitle}>الزائر السري</Text>
               <Text style={styles.appSubtitle}>تقييم مراكز الرعاية الصحية الأولية</Text>
               <Text style={styles.orgName}>تجمع الجوف الصحي</Text>
+              <Text style={styles.deptName}>إدارة الزائر السري بتجمع الجوف الصحي</Text>
             </View>
 
             {/* بطاقة تسجيل الدخول */}
@@ -219,6 +220,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255,255,255,0.65)",
     textAlign: "center",
+  },
+  deptName: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+    marginTop: 3,
   },
   card: {
     borderRadius: 20,

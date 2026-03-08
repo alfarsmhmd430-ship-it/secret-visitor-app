@@ -61,6 +61,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="compare"
+        options={{
+          title: "مقارنة",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="chart.bar.xaxis" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="results"
         options={{
           href: null, // Hidden from tab bar

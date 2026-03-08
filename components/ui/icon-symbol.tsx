@@ -39,6 +39,7 @@ const MAPPING = {
   "star.fill": "star",
   "xmark": "close",
   "checkmark": "check",
+  "chart.bar.xaxis": "compare",
 } as IconMapping;
 
 export function IconSymbol({
