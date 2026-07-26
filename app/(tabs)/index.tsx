@@ -27,7 +27,7 @@ export default function HomeScreen() {
   // توجيه لشاشة تسجيل الدخول إذا لم يكن المستخدم مصادقاً
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace("/login" as any);
+      router.replace("/login");
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -42,7 +42,7 @@ export default function HomeScreen() {
           style: "destructive",
           onPress: async () => {
             await logout();
-            router.replace("/login" as any);
+            router.replace("/login");
           },
         },
       ]
@@ -82,7 +82,7 @@ export default function HomeScreen() {
     return (
       <TouchableOpacity
         style={[styles.visitCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => router.push({ pathname: "/visit-detail" as any, params: { id: item.id } })}
+        onPress={() => router.push({ pathname: "/visit-detail", params: { id: item.id } })}
         activeOpacity={0.7}
       >
         <View style={styles.visitCardHeader}>
@@ -175,7 +175,7 @@ export default function HomeScreen() {
             {/* New Assessment Button */}
             <TouchableOpacity
               style={[styles.newAssessmentBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push("/(tabs)/assessment" as any)}
+              onPress={() => router.push("/(tabs)/assessment")}
               activeOpacity={0.85}
             >
               <IconSymbol name="plus.circle.fill" size={22} color="#FFFFFF" />
@@ -188,7 +188,7 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
                   آخر الزيارات
                 </Text>
-                <TouchableOpacity onPress={() => router.push("/(tabs)/history" as any)}>
+                <TouchableOpacity onPress={() => router.push("/(tabs)/history")}>
                   <Text style={[styles.seeAllText, { color: colors.primary }]}>عرض الكل</Text>
                 </TouchableOpacity>
               </View>

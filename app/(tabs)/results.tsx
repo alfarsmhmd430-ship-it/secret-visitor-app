@@ -442,7 +442,7 @@ export default function ResultsScreen() {
 
   const handleNewAssessment = () => {
     dispatch({ type: "RESET" });
-    router.replace("/(tabs)/assessment" as any);
+    router.replace("/(tabs)/assessment");
   };
 
   return (

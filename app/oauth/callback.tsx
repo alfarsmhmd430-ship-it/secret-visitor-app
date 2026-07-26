@@ -62,7 +62,7 @@ export default function OAuthCallback() {
           setStatus("success");
           console.log("[OAuth] Web authentication successful, redirecting to home...");
           setTimeout(() => {
-            router.replace("/(tabs)");
+            router.replace("/(tabs)/index");
           }, 1000);
           return;
         }
@@ -159,7 +159,7 @@ export default function OAuthCallback() {
           setStatus("success");
           console.log("[OAuth] Redirecting to home...");
           setTimeout(() => {
-            router.replace("/(tabs)");
+            router.replace("/(tabs)/index");
           }, 1000);
           return;
         }

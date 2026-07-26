@@ -528,7 +528,7 @@ export default function AssessmentScreen() {
     }
     const record = buildVisitRecord();
     router.push({
-      pathname: "/(tabs)/results" as any,
+      pathname: "/(tabs)/results",
       params: { visitData: JSON.stringify(record) },
     });
   }, [state.centerName, answered, buildVisitRecord, router]);

@@ -100,7 +100,7 @@ export default function HistoryScreen() {
         style={[styles.visitCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() =>
           router.push({
-            pathname: "/visit-detail" as any,
+            pathname: "/visit-detail",
             params: { id: item.id },
           })
         }
@@ -174,7 +174,7 @@ export default function HistoryScreen() {
               </View>
               <TouchableOpacity
                 style={styles.settingsBtn}
-                onPress={() => router.push("/change-password" as any)}
+                onPress={() => router.push("/change-password")}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={{ fontSize: 20 }}>⚙️</Text>

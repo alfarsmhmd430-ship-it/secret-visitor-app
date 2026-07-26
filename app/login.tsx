@@ -50,7 +50,7 @@ export default function LoginScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       // التوجيه للشاشة الرئيسية بعد نجاح تسجيل الدخول
-      router.replace("/(tabs)" as any);
+      router.replace("/(tabs)/index" as any);
     }
   };
 
