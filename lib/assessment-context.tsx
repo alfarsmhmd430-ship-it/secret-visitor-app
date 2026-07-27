@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useReducer, useCallback } from "react";
-import { ASSESSMENT_CATEGORIES, Category, Criterion } from "@/constants/criteria-data";
+"use client";
+
+import { createContext, useContext, useReducer, useCallback } from "react";
+import { VISITOR_JOURNEY_SECTIONS } from "@/constants/visitor-journey-sections";
 import { QuestionAnswer, CategoryResult, VisitRecord, generateVisitId } from "@/lib/storage";
 
 interface AssessmentState {
@@ -8,6 +10,10 @@ interface AssessmentState {
   visitDate: string;
   answers: Record<string, QuestionAnswer>;
   isComplete: boolean;
+  // الحقول الجديدة لنظام الأقسام المتسلسلة
+  currentSectionOrder: number; // ترتيب القسم الحالي (1-7)
+  completedSections: Set<number>; // الأقسام المكتملة
+  sectionNotes: Record<number, string>; // ملاحظات كل قسم
 }
 
 type AssessmentAction =
@@ -17,6 +23,9 @@ type AssessmentAction =
   | { type: "SET_REASON"; payload: { questionId: string; reason: string } }
   | { type: "ADD_PHOTO"; payload: { questionId: string; photoUri: string } }
   | { type: "REMOVE_PHOTO"; payload: { questionId: string; photoUri: string } }
+  | { type: "MOVE_TO_SECTION"; payload: number } // الانتقال إلى قسم محدد
+  | { type: "COMPLETE_SECTION"; payload: number } // إنهاء قسم
+  | { type: "SET_SECTION_NOTES"; payload: { sectionOrder: number; notes: string } }
   | { type: "RESET" };
 
 function createInitialState(): AssessmentState {
@@ -26,6 +35,9 @@ function createInitialState(): AssessmentState {
     visitDate: new Date().toISOString().split("T")[0],
     answers: {},
     isComplete: false,
+    currentSectionOrder: 1,
+    completedSections: new Set(),
+    sectionNotes: {},
   };
 }
 
@@ -33,8 +45,10 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
   switch (action.type) {
     case "SET_CENTER_NAME":
       return { ...state, centerName: action.payload };
+
     case "SET_VISIT_DATE":
       return { ...state, visitDate: action.payload };
+
     case "SET_ANSWER": {
       const { questionId, answer } = action.payload;
       const existing = state.answers[questionId] ?? { questionId, answer: null };
@@ -45,13 +59,14 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
           [questionId]: {
             ...existing,
             answer,
-            // Clear reason and photos if switching to yes
+            // مسح الملاحظات والصور عند تغيير الإجابة إلى "نعم"
             reason: answer === "yes" ? undefined : existing.reason,
             photoUris: answer === "yes" ? undefined : existing.photoUris,
           },
         },
       };
     }
+
     case "SET_REASON": {
       const { questionId, reason } = action.payload;
       const existing = state.answers[questionId] ?? { questionId, answer: null };
@@ -63,6 +78,7 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
         },
       };
     }
+
     case "ADD_PHOTO": {
       const { questionId, photoUri } = action.payload;
       const existing = state.answers[questionId] ?? { questionId, answer: null };
@@ -78,6 +94,7 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
         },
       };
     }
+
     case "REMOVE_PHOTO": {
       const { questionId, photoUri } = action.payload;
       const existing = state.answers[questionId];
@@ -93,15 +110,52 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
         },
       };
     }
+
+    case "MOVE_TO_SECTION": {
+      const newOrder = action.payload;
+      // منع الرجوع إلى قسم سابق مكتمل
+      if (newOrder < state.currentSectionOrder && state.completedSections.has(state.currentSectionOrder)) {
+        return state; // لا تسمح بالرجوع
+      }
+      return { ...state, currentSectionOrder: newOrder };
+    }
+
+    case "COMPLETE_SECTION": {
+      const sectionOrder = action.payload;
+      const newCompleted = new Set(state.completedSections);
+      newCompleted.add(sectionOrder);
+      return { ...state, completedSections: newCompleted };
+    }
+
+    case "SET_SECTION_NOTES": {
+      const { sectionOrder, notes } = action.payload;
+      return {
+        ...state,
+        sectionNotes: {
+          ...state.sectionNotes,
+          [sectionOrder]: notes,
+        },
+      };
+    }
+
     case "RESET":
       return createInitialState();
+
     default:
       return state;
   }
 }
 
 function calculateResults(state: AssessmentState): {
-  categoryResults: CategoryResult[];
+  sectionResults: Array<{
+    sectionId: string;
+    sectionName: string;
+    order: number;
+    yesCount: number;
+    noCount: number;
+    totalCount: number;
+    percentage: number;
+  }>;
   overallPercentage: number;
   totalYes: number;
   totalNo: number;
@@ -111,37 +165,37 @@ function calculateResults(state: AssessmentState): {
   let totalNo = 0;
   let totalQuestions = 0;
 
-  const categoryResults: CategoryResult[] = ASSESSMENT_CATEGORIES.map((cat) => {
-    let catYes = 0;
-    let catNo = 0;
-    cat.criteria.forEach((criterion) => {
+  const sectionResults = VISITOR_JOURNEY_SECTIONS.map((section) => {
+    let sectionYes = 0;
+    let sectionNo = 0;
+    section.criteria.forEach((criterion) => {
       const answer = state.answers[criterion.id];
-      if (answer?.answer === "yes") catYes++;
-      else if (answer?.answer === "no") catNo++;
+      if (answer?.answer === "yes") sectionYes++;
+      else if (answer?.answer === "no") sectionNo++;
     });
-    const catTotal = cat.criteria.length;
-    const catAnswered = catYes + catNo;
-    const catPercentage = catAnswered > 0 ? Math.round((catYes / catAnswered) * 100) : 0;
+    const sectionTotal = section.criteria.length;
+    const sectionAnswered = sectionYes + sectionNo;
+    const sectionPercentage = sectionAnswered > 0 ? Math.round((sectionYes / sectionAnswered) * 100) : 0;
 
-    totalYes += catYes;
-    totalNo += catNo;
-    totalQuestions += catTotal;
+    totalYes += sectionYes;
+    totalNo += sectionNo;
+    totalQuestions += sectionTotal;
 
     return {
-      categoryId: cat.id,
-      categoryName: cat.name,
-      weight: cat.weight,
-      yesCount: catYes,
-      noCount: catNo,
-      totalCount: catTotal,
-      percentage: catPercentage,
+      sectionId: section.id,
+      sectionName: section.name,
+      order: section.order,
+      yesCount: sectionYes,
+      noCount: sectionNo,
+      totalCount: sectionTotal,
+      percentage: sectionPercentage,
     };
   });
 
   const totalAnswered = totalYes + totalNo;
   const overallPercentage = totalAnswered > 0 ? Math.round((totalYes / totalAnswered) * 100) : 0;
 
-  return { categoryResults, overallPercentage, totalYes, totalNo, totalQuestions };
+  return { sectionResults, overallPercentage, totalYes, totalNo, totalQuestions };
 }
 
 interface AssessmentContextType {
@@ -151,6 +205,13 @@ interface AssessmentContextType {
   getAnsweredCount: () => number;
   getTotalCount: () => number;
   getProgressPercentage: () => number;
+  getCurrentSection: () => (typeof VISITOR_JOURNEY_SECTIONS)[0] | undefined;
+  getSectionProgress: (sectionOrder: number) => { answered: number; total: number; percentage: number };
+  canGoToNextSection: () => boolean;
+  canGoToPreviousSection: () => boolean;
+  goToNextSection: () => void;
+  goToPreviousSection: () => void;
+  isSectionCompleted: (sectionOrder: number) => boolean;
 }
 
 const AssessmentContext = createContext<AssessmentContextType | null>(null);
@@ -158,9 +219,72 @@ const AssessmentContext = createContext<AssessmentContextType | null>(null);
 export function AssessmentProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(assessmentReducer, undefined, createInitialState);
 
+  const getCurrentSection = useCallback(() => {
+    return VISITOR_JOURNEY_SECTIONS.find((s) => s.order === state.currentSectionOrder);
+  }, [state.currentSectionOrder]);
+
+  const getSectionProgress = useCallback(
+    (sectionOrder: number) => {
+      const section = VISITOR_JOURNEY_SECTIONS.find((s) => s.order === sectionOrder);
+      if (!section) return { answered: 0, total: 0, percentage: 0 };
+
+      let answered = 0;
+      section.criteria.forEach((criterion) => {
+        const answer = state.answers[criterion.id];
+        if (answer?.answer !== null && answer?.answer !== undefined) {
+          answered++;
+        }
+      });
+
+      const total = section.criteria.length;
+      const percentage = total > 0 ? Math.round((answered / total) * 100) : 0;
+
+      return { answered, total, percentage };
+    },
+    [state.answers]
+  );
+
+  const canGoToNextSection = useCallback(() => {
+    return state.currentSectionOrder < VISITOR_JOURNEY_SECTIONS.length;
+  }, [state.currentSectionOrder]);
+
+  const canGoToPreviousSection = useCallback(() => {
+    return state.currentSectionOrder > 1;
+  }, [state.currentSectionOrder]);
+
+  const goToNextSection = useCallback(() => {
+    if (canGoToNextSection()) {
+      dispatch({ type: "MOVE_TO_SECTION", payload: state.currentSectionOrder + 1 });
+    }
+  }, [state.currentSectionOrder, canGoToNextSection]);
+
+  const goToPreviousSection = useCallback(() => {
+    if (canGoToPreviousSection()) {
+      dispatch({ type: "MOVE_TO_SECTION", payload: state.currentSectionOrder - 1 });
+    }
+  }, [state.currentSectionOrder, canGoToPreviousSection]);
+
+  const isSectionCompleted = useCallback(
+    (sectionOrder: number) => {
+      return state.completedSections.has(sectionOrder);
+    },
+    [state.completedSections]
+  );
+
   const buildVisitRecord = useCallback((): VisitRecord => {
-    const { categoryResults, overallPercentage, totalYes, totalNo, totalQuestions } =
-      calculateResults(state);
+    const { sectionResults, overallPercentage, totalYes, totalNo, totalQuestions } = calculateResults(state);
+
+    // تحويل نتائج الأقسام إلى نتائج الفئات للتوافق مع البنية القديمة
+    const categoryResults: CategoryResult[] = sectionResults.map((sr) => ({
+      categoryId: sr.sectionId,
+      categoryName: sr.sectionName,
+      weight: 100 / sectionResults.length, // توزيع متساوي
+      yesCount: sr.yesCount,
+      noCount: sr.noCount,
+      totalCount: sr.totalCount,
+      percentage: sr.percentage,
+    }));
+
     return {
       id: state.visitId,
       centerName: state.centerName,
@@ -176,11 +300,11 @@ export function AssessmentProvider({ children }: { children: React.ReactNode }) 
   }, [state]);
 
   const getAnsweredCount = useCallback(() => {
-    return Object.values(state.answers).filter((a) => a.answer !== null).length;
+    return Object.values(state.answers).filter((a) => a.answer !== null && a.answer !== undefined).length;
   }, [state.answers]);
 
   const getTotalCount = useCallback(() => {
-    return ASSESSMENT_CATEGORIES.reduce((sum, cat) => sum + cat.criteria.length, 0);
+    return VISITOR_JOURNEY_SECTIONS.reduce((sum, section) => sum + section.criteria.length, 0);
   }, []);
 
   const getProgressPercentage = useCallback(() => {
@@ -191,7 +315,21 @@ export function AssessmentProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <AssessmentContext.Provider
-      value={{ state, dispatch, buildVisitRecord, getAnsweredCount, getTotalCount, getProgressPercentage }}
+      value={{
+        state,
+        dispatch,
+        buildVisitRecord,
+        getAnsweredCount,
+        getTotalCount,
+        getProgressPercentage,
+        getCurrentSection,
+        getSectionProgress,
+        canGoToNextSection,
+        canGoToPreviousSection,
+        goToNextSection,
+        goToPreviousSection,
+        isSectionCompleted,
+      }}
     >
       {children}
     </AssessmentContext.Provider>
